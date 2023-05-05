@@ -64,6 +64,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(level)
 
 if not args.database:
+# see discussion here:
+# https://stackoverflow.com/questions/24180527/argparse-required-arguments-listed-under-optional-arguments
     message('\nError: the argument "-d / --database" is required!\n')
     help_exit()    
 
