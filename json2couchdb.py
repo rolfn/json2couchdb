@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-# Rolf Niepraschk, Rolf.Niepraschk@gmx.de, 2023-05-04
+# Rolf Niepraschk, Rolf.Niepraschk@gmx.de, 2023-05-05
 
 import os, sys, argparse, logging, json, requests
 from requests.utils import quote
 from requests.exceptions import HTTPError
 from pathlib import Path
 
-VERSION = '3.1.1';
+VERSION = '3.1.2';
 
 DESCRIPTION = '''
 Submits the content of one or more JSON files to CouchDB.
@@ -31,8 +31,8 @@ parser.add_argument('-u', '--username', type=str, default=False, \
   help='Username, default=no username')
 parser.add_argument('-p', '--passwd', type=str, default=False, \
   help='Password, default=no password')
-parser.add_argument('-d', '--database', type=str, default='vl_db', \
-  help='Database, default="vl_db"')
+parser.add_argument('-d', '--database', type=str, default=False, \
+  help='Database (required!)')
 parser.add_argument('-c', '--create_db', action='store_true', \
   help='Create database if necessary')  
 parser.add_argument('-k', '--keep_rev', action='store_true', \
@@ -62,6 +62,10 @@ else:
 logging.basicConfig(format=fmt)
 logger = logging.getLogger(__name__)
 logger.setLevel(level)
+
+if not args.database:
+    message('\nError: the argument "-d / --database" is required!\n')
+    help_exit()    
 
 logger.debug('args: {}'.format(json.dumps(vars(args), indent=2))) 
     
