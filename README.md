@@ -34,7 +34,7 @@ optional arguments:
 
 ## Examples
 
-### Send the content of files to a database 
+### Send the content of files
 
 ```
 python3 json2couch.py -d xxx '*.json'
