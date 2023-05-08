@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
-# Rolf Niepraschk, Rolf.Niepraschk@gmx.de, 2023-05-05
+# Rolf Niepraschk, Rolf.Niepraschk@gmx.de, 2023-05-08
 
 import os, sys, argparse, logging, json, requests
 from requests.utils import quote
 from requests.exceptions import HTTPError
+from requests.exceptions import ConnectionError
 from pathlib import Path
 
-VERSION = '3.1.2';
+VERSION = '3.2.0';
 
 DESCRIPTION = '''
 Submits the content of one or more JSON files to CouchDB.
@@ -16,7 +17,8 @@ Filenames with wildcards must be escaped with quotes.
 
 # Kommandozeilen-Parser
 parser = argparse.ArgumentParser(description=DESCRIPTION)
-parser.add_argument(dest="json_files", type=str, help='file pattern')
+parser.add_argument(dest="json_files", type=str, \
+  help='file pattern or "-" to read from standard input')
 parser.add_argument('-v', '--verbose', action='store_true', \
   help='Detailed outputs')
 parser.add_argument("-V", "--version", action="version", \
@@ -64,7 +66,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(level)
 
 if not args.database:
-# see discussion here:
+# see the discussion here:
 # https://stackoverflow.com/questions/24180527/argparse-required-arguments-listed-under-optional-arguments
     message('\nError: the argument "-d / --database" is required!\n')
     help_exit()    
@@ -80,34 +82,34 @@ if args.username:
     else:
         auth = '{}@'.format(u)
 
-# URL zum generellen CouchDB-Zugriff
+# URL for general CouchDB access
 baseURL ='{}://{}{}:{}/'.format(args.protocol, auth, args.host, args.port)
-msg = ''
+
 try:
-    response = requests.get(baseURL)# Testen, ob CouchDB zugreifbar.
-except HTTPError as e:
-    msg = e.response.reason    
-if not response.status_code == 200: # Wenn kein Zugriff, dann Abbruch
+    response = requests.get(baseURL)# Test if CouchDB is accessible.
+except ConnectionError as e:
+    message_exit('Error: {}'.format(e))
+    
+if response.status_code == 200:
+    # URL to access the specific database ('-d ...')
+    baseURL ='{}://{}{}:{}/{}/'.format(args.protocol, auth, args.host, \
+      args.port, args.database)
+    logger.debug('baseURL: {}'.format(baseURL))
+else:
     message_exit('Error: {}'.format(response.reason))
 
-# URL zum Zugriff auf die spezifische Datenbank ('-d ...')
-baseURL ='{}://{}{}:{}/{}/'.format(args.protocol, auth, args.host, \
-args.port, args.database)
-logger.debug('baseURL: {}'.format(baseURL))
-
-response = requests.get(baseURL) # Testen, ob DB zugreifbar.
-if not response.status_code == 200: # Kein Zugriff
+response = requests.get(baseURL) # Test if specific database is accessible.
+if not response.status_code == 200: # No access
     if response.status_code == 404: # Object Not Found
-        data = response.json() # CouchDB-Antwort
+        data = response.json() 
         logger.debug('{}'.format(data['reason']))
-        if args.create_db == True: # Erzeugen der DB erlaubt?
+        if args.create_db == True: # Creation of the database allowed?
             logger.debug('Create "{}"'.format(args.database))
             response = requests.put(baseURL)
             logger.debug('Reason: {}'.format(response.reason))
             if not response.status_code == 201: # Created
-                data = response.json() # erzeugt Dictionary-Variable
+                data = response.json()
                 message_exit('Error: {}'.format(data['reason']))
-                sys.exit(-1)
         else:
             message_exit('Error: Database does not exist')
 
@@ -130,11 +132,14 @@ def getRev(url):
         rev = False
     return rev
     
-def sendto_couchdb(name, d):
+def sendto_couchdb(d, name=False):
     global posted; global args
-    basename = Path(name).stem
     if not '_id' in d:
-        d['_id'] = basename
+        if name:
+            basename = Path(name).stem
+            d['_id'] = basename
+        else:
+            message_exit('Error: Missing _id entry')
     url = baseURL + quote(d['_id']);
     logger.debug('url: {}'.format(url))
     rev = getRev(url)
@@ -147,38 +152,49 @@ def sendto_couchdb(name, d):
     if '_attachments' in d:
         del d['_attachments']
     response = requests.put(url, json=d)
-    data = response.json() # erzeugt Dictionary-Variable
+    data = response.json()
     if response.status_code == 201: # Created
         logger.debug('New revision: {}'.format(data['rev']))
         posted += 1
-        message('{}. {} <-- {}'.format(posted, args.database, fn))
+        message('{}. {} <-- {}'.format(posted, args.database, \
+          name if name else '{...}'))
     else:
         logger.debug('Reason: {}'.format(data['reason']))
 
 def conclusion():
     global posted; global args
-    message('\n>>> {} documents sent to the database "{}" <<<\n' \
+    message('\n>>> {} document(s) sent to the database "{}" <<<\n' \
       .format(posted, args.database))
 
-message('\nSubmit file contents to the database\n')
-something_exists = False
-for fn in Path(".").glob(args.json_files):
-    if os.path.isfile(fn):
-        something_exists = True
-        with open(fn , 'r', encoding="utf8") as f:
-            jstr = f.read()
+if args.json_files == '-': # Read content from standard input
+    jstr = ''
+    for line in sys.stdin:
+        jstr += line
+    try:    
         data = json.loads(jstr)
-        sendto_couchdb(fn, data)
-    else:
-        message('File {} not found'.format(fn))
-
-if something_exists == False:
-    message('No files found!')
-    help_exit()
+    except ValueError as e:
+        message_exit('Error: invalid JSON')
+    sendto_couchdb(data)
+else: # Process real files
+    message('\nSubmit file contents to the database\n')
+    something_exists = False
+    for fn in Path(".").glob(args.json_files):
+        if os.path.isfile(fn):
+            something_exists = True
+            with open(fn , 'r', encoding="utf8") as f:
+                jstr = f.read()
+            try:
+                data = json.loads(jstr)
+            except ValueError as e:
+                message_exit('Error: invalid JSON')
+            sendto_couchdb(data, fn)
+        else:
+            message('File {} not found'.format(fn))
+    if not something_exists:
+        message('No files found!')
+        help_exit()
 
 conclusion()
 
 sys.exit(0)
-
-# TODO: als pipe ... (???)
 
