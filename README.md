@@ -34,10 +34,18 @@ optional arguments:
 
 ## Examples
 
-```
-cat foo.json | ./json2couchdb.py -d xxx -
+### Send the content of files to a database 
 
-curl -s http://myhost:5984/xxx/mydocument | ./json2couchdb.py -d yyy -
+```
+python3 json2couch.py -d xxx '*.json'
+```
+
+### Read content from standard input
+
+```
+cat foo.json | python3 json2couch.py -d xxx -
+
+curl -s http://myhost:5984/xxx/mydocument | python3 json2couch.py -H myhost -d yyy -
 ```
 
 Note: When reading from standard input, the JSON structure must contain an `_id` entry.
