@@ -4,15 +4,15 @@ Submits the content of one or more JSON files to CouchDB.
 ## Syntax
 
 ```
-usage: json2couchdb.py [-h] [-v] [-V] [-r PROTOCOL] [-H HOST] [-P PORT]
-                       [-u USERNAME] [-p PASSWD] [-d DATABASE] [-c] [-k]
-                       json_files
+usage: python3 json2couchdb.py [-h] [-v] [-V] [-r PROTOCOL] [-H HOST] [-P PORT]
+                               [-u USERNAME] [-p PASSWD] [-d DATABASE] [-c] [-k]
+                               json_files
 
 Submits the content of one or more JSON files to CouchDB. Filenames with
 wildcards must be escaped with quotes.
 
 positional arguments:
-  json_files            file pattern
+  json_files            file pattern or "-" to read from standard input
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -31,3 +31,16 @@ optional arguments:
   -c, --create_db       Create database if necessary
   -k, --keep_rev        Never suppress entry "_rev"
 ```
+
+## Examples
+
+```
+cat foo.json | ./json2couchdb.py -d xxx -
+
+curl -s http://myhost:5984/xxx/mydocument | ./json2couchdb.py -d yyy -
+```
+
+Note: When reading from standard input, the JSON structure must contain an `_id` entry.
+
+
+
