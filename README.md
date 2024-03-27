@@ -37,15 +37,15 @@ optional arguments:
 ### Send the content of files
 
 ```
-python3 json2couch.py -d xxx '*.json'
+python3 json2couchdb.py -d xxx '*.json'
 ```
 
 ### Read content from standard input
 
 ```
-cat foo.json | python3 json2couch.py -d xxx -
+cat foo.json | python3 json2couchdb.py -d xxx -
 
-curl -s http://myhost:5984/xxx/mydocument | python3 json2couch.py -H myhost -d yyy -
+curl -s http://myhost:5984/xxx/mydocument | python3 json2couchdb.py -H myhost -d yyy -
 ```
 
 Note: When reading from standard input, the JSON structure must contain an `_id` entry.
